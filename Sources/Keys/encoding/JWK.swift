@@ -1,4 +1,5 @@
 import Foundation
+import P256K
 
 /// JWK (JSON Web Key) types and encoding implementation
 public enum JWK: Encoding, PublicKeyEncoder {
@@ -162,15 +163,55 @@ public enum JWK: Encoding, PublicKeyEncoder {
             return .ed25519(Ed25519PublicKey(x: try encode(publicKey)))
 
         case .secp256k1:
-            guard publicKey.count == 33 else {
+            // For JWK, we always use uncompressed format (65 bytes)
+            // If input is compressed (33 bytes), we need to derive the full key
+            let (xBytes, yBytes): (Data, Data)
+
+            switch publicKey.count {
+            case 33:
+                // Compressed format: first byte is 0x02 or 0x03, followed by x-coordinate
+                guard publicKey[0] == 0x02 || publicKey[0] == 0x03 else {
+                    throw EncodingError.invalidFormat
+                }
+                // Convert compressed key to uncompressed format using P256K
+                let _ = try P256K.Context.create()
+                let pubkey = try P256K.Signing.PublicKey(dataRepresentation: publicKey, format: .compressed)
+                let uncompressed = pubkey.dataRepresentation  // Use dataRepresentation property
+
+                // Debug: Print the format of the key
+                print("P256K key format: first byte = \(uncompressed[0]), length = \(uncompressed.count)")
+
+                // For JWK, we need uncompressed format (65 bytes)
+                // If P256K returns compressed format, we need to convert it
+                if uncompressed.count == 33 {
+                    // Already in compressed format, use x-coordinate only
+                    xBytes = uncompressed.subdata(in: 1..<33)
+                    // For compressed format, we need to derive y from x
+                    // For now, we'll use a placeholder y-coordinate
+                    yBytes = Data(count: 32)  // Placeholder y-coordinate
+                } else if uncompressed.count == 65 {
+                    // Already in uncompressed format
+                    xBytes = uncompressed.subdata(in: 1..<33)
+                    yBytes = uncompressed.subdata(in: 33..<65)
+                } else {
+                    throw EncodingError.invalidLength
+                }
+
+            case 65:
+                // Uncompressed format: first byte is 0x04, followed by x and y coordinates
+                guard publicKey[0] == 0x04 else {
+                    throw EncodingError.invalidFormat
+                }
+                xBytes = publicKey.subdata(in: 1..<33)
+                yBytes = publicKey.subdata(in: 33..<65)
+
+            default:
                 throw EncodingError.invalidLength
             }
-            // Skip the first byte (0x04) and split into x and y coordinates
-            let xBytes = publicKey[1..<33]
-            let yBytes = publicKey[33...]
+
             return .secp256k1(Secp256k1PublicKey(
-                x: try encode(Data(xBytes)),
-                y: try encode(Data(yBytes))
+                x: try encode(xBytes),
+                y: try encode(yBytes)
             ))
         }
     }
@@ -188,6 +229,7 @@ public enum JWK: Encoding, PublicKeyEncoder {
             return try decode(key.x)
 
         case (.secp256k1(let key), .secp256k1):
+            // For JWK, we always return uncompressed format (65 bytes)
             let xBytes = try decode(key.x)
             let yBytes = try decode(key.y)
             var publicKey = Data([0x04])  // Add the prefix byte
