@@ -144,7 +144,7 @@ public enum Base58: Encoding, PublicKeyEncoder {
     ///   - publicKey: The public key data to encode
     ///   - algorithm: The algorithm used to generate the key pair
     /// - Returns: A Base58 string representation of the public key
-    /// - Throws: ``EncodingError/invalidLength`` if the public key length is invalid for the algorithm
+    /// - Throws: ``EncodingError/unsupportedAlgorithm`` if the public key length is invalid for the algorithm
     ///
     /// # Example
     /// ```swift
@@ -157,6 +157,18 @@ public enum Base58: Encoding, PublicKeyEncoder {
     /// let encoded2 = try Base58.encodePublicKey(secpKey, algorithm: .secp256k1)  // "2VfUX..."
     /// ```
     public static func encodePublicKey(_ publicKey: Data, algorithm: KeypairAlgorithm) throws -> String {
+        // Validate key length based on algorithm
+        switch algorithm {
+        case .ed25519:
+            guard publicKey.count == 32 else {
+                throw EncodingError.unsupportedAlgorithm
+            }
+        case .secp256k1:
+            guard publicKey.count == 33 || publicKey.count == 65 else {
+                throw EncodingError.unsupportedAlgorithm
+            }
+        }
+
         // For public keys, we might want to add a prefix or checksum
         // This is a simple implementation that just encodes the raw bytes
         return try encode(publicKey)
@@ -170,8 +182,7 @@ public enum Base58: Encoding, PublicKeyEncoder {
     ///   - string: The Base58 string to decode
     ///   - algorithm: The algorithm used to generate the key pair
     /// - Returns: The decoded public key data
-    /// - Throws:
-    ///   - ``EncodingError/invalidLength`` if the decoded data length is invalid for the algorithm
+    /// - Throws: ``EncodingError/unsupportedAlgorithm`` if the decoded data length is invalid for the algorithm
     ///   - ``EncodingError/invalidCharacter`` if the string contains invalid Base58 characters
     ///
     /// # Example
@@ -185,20 +196,17 @@ public enum Base58: Encoding, PublicKeyEncoder {
     /// let key2 = try Base58.decodePublicKey(base58String2, algorithm: .secp256k1)  // Data([...])
     /// ```
     public static func decodePublicKey(_ string: String, algorithm: KeypairAlgorithm) throws -> Data {
-        // For public keys, we might want to verify a prefix or checksum
-        // This is a simple implementation that just decodes the raw bytes
         let data = try decode(string)
 
         // Verify length based on algorithm
         switch algorithm {
         case .ed25519:
             guard data.count == 32 else {
-                throw EncodingError.invalidLength
+                throw EncodingError.unsupportedAlgorithm
             }
         case .secp256k1:
-            // secp256k1 public keys can be 33 bytes (compressed) or 65 bytes (uncompressed)
             guard data.count == 33 || data.count == 65 else {
-                throw EncodingError.invalidLength
+                throw EncodingError.unsupportedAlgorithm
             }
         }
 

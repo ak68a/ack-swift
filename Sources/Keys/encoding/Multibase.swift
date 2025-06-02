@@ -271,9 +271,20 @@ public enum Multibase: Encoding, PublicKeyEncoder {
     /// try Multibase.encodePublicKey(invalidKey, algorithm: .ed25519)  // throws EncodingError.invalidLength
     /// ```
     public static func encodePublicKey(_ publicKey: Data, algorithm: KeypairAlgorithm) throws -> String {
-        // For public keys, we'll use base58btc by default as it's most commonly used
-        // for public key encoding in blockchain applications
-        return try encode(publicKey, encoding: .base58btc)
+        // Validate key length based on algorithm
+        switch algorithm {
+        case .ed25519:
+            guard publicKey.count == 32 else {
+                throw EncodingError.unsupportedAlgorithm
+            }
+        case .secp256k1:
+            guard publicKey.count == 33 || publicKey.count == 65 else {
+                throw EncodingError.unsupportedAlgorithm
+            }
+        }
+
+        // Encode using multibase
+        return try encode(publicKey)
     }
 
     /// Decode a public key from multibase
@@ -311,15 +322,15 @@ public enum Multibase: Encoding, PublicKeyEncoder {
     public static func decodePublicKey(_ string: String, algorithm: KeypairAlgorithm) throws -> Data {
         let data = try decode(string)
 
-        // Validate the decoded data based on the algorithm
+        // Verify length based on algorithm
         switch algorithm {
         case .ed25519:
             guard data.count == 32 else {
-                throw EncodingError.invalidLength
+                throw EncodingError.unsupportedAlgorithm
             }
         case .secp256k1:
             guard data.count == 33 || data.count == 65 else {
-                throw EncodingError.invalidLength
+                throw EncodingError.unsupportedAlgorithm
             }
         }
 

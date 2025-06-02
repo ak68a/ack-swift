@@ -151,13 +151,13 @@ public enum Hex: Encoding, PublicKeyEncoder {
     /// Encode a public key to hex
     ///
     /// Encodes a public key to a hex string, validating the key length based on the algorithm.
-    /// The output is always lowercase and does not include a "0x" prefix.
+    /// The output is always lowercase and does not include a "0x" prefix, matching the TypeScript implementation.
     ///
     /// - Parameters:
     ///   - publicKey: The public key data to encode
     ///   - algorithm: The algorithm used to generate the key pair
-    /// - Returns: A hex string representation of the public key
-    /// - Throws: ``EncodingError/invalidLength`` if the public key length is invalid for the algorithm
+    /// - Returns: A hex string representation of the public key without "0x" prefix
+    /// - Throws: ``EncodingError/unsupportedAlgorithm`` if the algorithm doesn't match the key type
     ///
     /// # Example
     /// ```swift
@@ -171,11 +171,22 @@ public enum Hex: Encoding, PublicKeyEncoder {
     ///
     /// // Invalid length
     /// let invalidKey = Data([1, 2, 3])
-    /// try Hex.encodePublicKey(invalidKey, algorithm: .ed25519)  // throws EncodingError.invalidLength
+    /// try Hex.encodePublicKey(invalidKey, algorithm: .ed25519)  // throws EncodingError.unsupportedAlgorithm
     /// ```
     public static func encodePublicKey(_ publicKey: Data, algorithm: KeypairAlgorithm) throws -> String {
-        // For public keys, we might want to add a prefix or format differently
-        // This is a simple implementation that just encodes the raw bytes
+        // Validate key length based on algorithm
+        switch algorithm {
+        case .ed25519:
+            guard publicKey.count == 32 else {
+                throw EncodingError.unsupportedAlgorithm
+            }
+        case .secp256k1:
+            guard publicKey.count == 33 || publicKey.count == 65 else {
+                throw EncodingError.unsupportedAlgorithm
+            }
+        }
+
+        // Match TypeScript implementation: no 0x prefix
         return try encode(publicKey)
     }
 
@@ -189,7 +200,7 @@ public enum Hex: Encoding, PublicKeyEncoder {
     ///   - algorithm: The algorithm used to generate the key pair
     /// - Returns: The decoded public key data
     /// - Throws:
-    ///   - ``EncodingError/invalidLength`` if the decoded data length is invalid for the algorithm
+    ///   - ``EncodingError/unsupportedAlgorithm`` if the key validation fails
     ///   - ``EncodingError/invalidCharacter`` if the string contains invalid hex characters
     ///
     /// # Example
@@ -202,9 +213,9 @@ public enum Hex: Encoding, PublicKeyEncoder {
     /// let hexString2 = "0x" + String(repeating: "01", count: 65)
     /// let key2 = try Hex.decodePublicKey(hexString2, algorithm: .secp256k1)  // Data([1, 1, ...])
     ///
-    /// // Invalid length
+    /// // Invalid key
     /// let invalidHex = "0x0102"
-    /// try Hex.decodePublicKey(invalidHex, algorithm: .ed25519)  // throws EncodingError.invalidLength
+    /// try Hex.decodePublicKey(invalidHex, algorithm: .ed25519)  // throws EncodingError.unsupportedAlgorithm
     ///
     /// // Invalid characters
     /// let invalidChars = "0x123g"
@@ -218,12 +229,12 @@ public enum Hex: Encoding, PublicKeyEncoder {
         switch algorithm {
         case .ed25519:
             guard data.count == 32 else {
-                throw EncodingError.invalidLength
+                throw EncodingError.unsupportedAlgorithm
             }
         case .secp256k1:
             // secp256k1 public keys can be 33 bytes (compressed) or 65 bytes (uncompressed)
             guard data.count == 33 || data.count == 65 else {
-                throw EncodingError.invalidLength
+                throw EncodingError.unsupportedAlgorithm
             }
         }
 

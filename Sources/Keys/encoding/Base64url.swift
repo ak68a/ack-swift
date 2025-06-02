@@ -137,7 +137,7 @@ public enum Base64url: Encoding, PublicKeyEncoder {
     ///   - publicKey: The public key data to encode
     ///   - algorithm: The algorithm used to generate the key pair
     /// - Returns: A Base64url string representation of the public key
-    /// - Throws: ``EncodingError/invalidLength`` if the public key length is invalid for the algorithm
+    /// - Throws: ``EncodingError/unsupportedAlgorithm`` if the public key length is invalid for the algorithm
     ///
     /// # Example
     /// ```swift
@@ -151,18 +151,18 @@ public enum Base64url: Encoding, PublicKeyEncoder {
     ///
     /// // Invalid length
     /// let invalidKey = Data([1, 2, 3])
-    /// try Base64url.encodePublicKey(invalidKey, algorithm: .ed25519)  // throws EncodingError.invalidLength
+    /// try Base64url.encodePublicKey(invalidKey, algorithm: .ed25519)  // throws EncodingError.unsupportedAlgorithm
     /// ```
     public static func encodePublicKey(_ publicKey: Data, algorithm: KeypairAlgorithm) throws -> String {
         // Validate key length based on algorithm
         switch algorithm {
         case .ed25519:
             guard publicKey.count == 32 else {
-                throw EncodingError.invalidLength
+                throw EncodingError.unsupportedAlgorithm
             }
         case .secp256k1:
             guard publicKey.count == 33 || publicKey.count == 65 else {
-                throw EncodingError.invalidLength
+                throw EncodingError.unsupportedAlgorithm
             }
         }
 
@@ -179,9 +179,7 @@ public enum Base64url: Encoding, PublicKeyEncoder {
     ///   - string: The Base64url string to decode
     ///   - algorithm: The algorithm used to generate the key pair
     /// - Returns: The decoded public key data
-    /// - Throws:
-    ///   - ``EncodingError/invalidLength`` if the decoded data length is invalid for the algorithm
-    ///   - ``EncodingError/invalidCharacter`` if the string contains invalid Base64url characters
+    /// - Throws: ``EncodingError/unsupportedAlgorithm`` if the decoded data length is invalid for the algorithm
     ///
     /// # Example
     /// ```swift
@@ -195,29 +193,28 @@ public enum Base64url: Encoding, PublicKeyEncoder {
     ///
     /// // Invalid length
     /// let invalidLength = "AQID"
-    /// try Base64url.decodePublicKey(invalidLength, algorithm: .ed25519)  // throws EncodingError.invalidLength
+    /// try Base64url.decodePublicKey(invalidLength, algorithm: .ed25519)  // throws EncodingError.unsupportedAlgorithm
     ///
     /// // Invalid characters
     /// let invalidChars = "AQIDBA=="
-    /// try Base64url.decodePublicKey(invalidChars, algorithm: .ed25519)  // throws EncodingError.invalidCharacter
+    /// try Base64url.decodePublicKey(invalidChars, algorithm: .ed25519)  // throws EncodingError.unsupportedAlgorithm
     /// ```
     public static func decodePublicKey(_ string: String, algorithm: KeypairAlgorithm) throws -> Data {
-        // First decode the base64url string
-        let decoded = try decode(string)
+        let data = try decode(string)
 
-        // Validate key length based on algorithm
+        // Verify length based on algorithm
         switch algorithm {
         case .ed25519:
-            guard decoded.count == 32 else {
-                throw EncodingError.invalidLength
+            guard data.count == 32 else {
+                throw EncodingError.unsupportedAlgorithm
             }
         case .secp256k1:
-            guard decoded.count == 33 || decoded.count == 65 else {
-                throw EncodingError.invalidLength
+            guard data.count == 33 || data.count == 65 else {
+                throw EncodingError.unsupportedAlgorithm
             }
         }
 
-        return decoded
+        return data
     }
 
     /// Check if a string is a valid public key in Base64url
