@@ -87,7 +87,27 @@ public func signSecp256k1(_ message: Data, privateKey: Data) throws -> Data {
 /// Verify a signature using a secp256k1 public key
 public func verifySecp256k1(signature: Data, message: Data, publicKey: Data) throws -> Bool {
     let _ = try P256K.Context.create()
-    let pubkey = try P256K.Signing.PublicKey(dataRepresentation: publicKey, format: .compressed)
+
+    // Determine the format based on key length and first byte
+    let format: P256K.Format
+    switch publicKey.count {
+    case 33:
+        // Compressed format (33 bytes)
+        guard publicKey[0] == 0x02 || publicKey[0] == 0x03 else {
+            throw KeyError.invalidFormat
+        }
+        format = .compressed
+    case 65:
+        // Uncompressed format (65 bytes)
+        guard publicKey[0] == 0x04 else {
+            throw KeyError.invalidFormat
+        }
+        format = .uncompressed
+    default:
+        throw KeyError.invalidFormat
+    }
+
+    let pubkey = try P256K.Signing.PublicKey(dataRepresentation: publicKey, format: format)
     let sig = try P256K.Signing.ECDSASignature(dataRepresentation: signature)
     return pubkey.isValidSignature(sig, for: message)
 }
