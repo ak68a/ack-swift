@@ -63,12 +63,27 @@ public func jwkToKeypair(_ jwk: JWK.PrivateKey) throws -> Keypair {
 ///   - algorithm: The algorithm used to generate the key pair
 ///   - encoding: The desired encoding format (``PublicKeyEncoding/hex``, ``PublicKeyEncoding/jwk``, etc.)
 /// - Returns: The encoded public key in the specified format
-/// - Throws: ``KeyError/unsupportedAlgorithm`` if the encoding format is not supported
+/// - Throws:
+///   - ``EncodingError/invalidFormat`` if the encoded string is invalid
+///   - ``EncodingError/unsupportedAlgorithm`` if the encoding format is not supported
 public func encodePublicKey<T>(
     _ publicKey: Data,
     algorithm: KeypairAlgorithm,
     encoding: PublicKeyEncoding
 ) throws -> T {
+    // First validate the key length based on algorithm
+    switch algorithm {
+    case .ed25519:
+        guard publicKey.count == 32 else {
+            throw EncodingError.unsupportedAlgorithm
+        }
+    case .secp256k1:
+        guard publicKey.count == 33 || publicKey.count == 65 else {
+            throw EncodingError.unsupportedAlgorithm
+        }
+    }
+
+    // Then encode using the specified format
     switch encoding {
     case .hex:
         return try Hex.encodePublicKey(publicKey, algorithm: algorithm) as! T
@@ -89,8 +104,8 @@ public func encodePublicKey<T>(
 ///   - encoding: The encoding format used (``PublicKeyEncoding/hex``, ``PublicKeyEncoding/jwk``, etc.)
 /// - Returns: The decoded public key as ``Data``
 /// - Throws:
-///   - ``KeyError/invalidFormat`` if the encoded string is invalid
-///   - ``KeyError/unsupportedAlgorithm`` if the encoding format is not supported
+///   - ``EncodingError/invalidFormat`` if the encoded string is invalid
+///   - ``EncodingError/unsupportedAlgorithm`` if the encoding format is not supported
 public func decodePublicKey(
     _ string: String,
     algorithm: KeypairAlgorithm,
@@ -102,6 +117,9 @@ public func decodePublicKey(
     case .jwk:
         return try JWK.decodePublicKey(string, algorithm: algorithm)
     case .multibase:
+        if !Multibase.isValid(string) {
+            throw EncodingError.invalidFormat
+        }
         return try Multibase.decodePublicKey(string, algorithm: algorithm)
     case .base58:
         return try Base58.decodePublicKey(string, algorithm: algorithm)
