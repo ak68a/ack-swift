@@ -1,6 +1,7 @@
 import Foundation
 import Crypto
 import P256K
+import BigInt
 
 /// Generate a new secp256k1 key pair
 public func generateSecp256k1Keypair(privateKeyBytes: Data? = nil) async throws -> Keypair {
@@ -78,36 +79,91 @@ private func getPublicKey(from privateKey: Data) throws -> Data {
 
 /// Sign a message using a secp256k1 private key
 public func signSecp256k1(_ message: Data, privateKey: Data) throws -> Data {
-    let _ = try P256K.Context.create()
-    let seckey = try P256K.Signing.PrivateKey(dataRepresentation: privateKey)
-    let signature = try seckey.signature(for: message)
-    return signature.dataRepresentation
+    do {
+        let _ = try P256K.Context.create()
+        let seckey = try P256K.Signing.PrivateKey(dataRepresentation: privateKey)
+        let signature = try seckey.signature(for: message)
+        let sigData = signature.dataRepresentation
+
+        // Basic validation that P256K might not do
+        guard sigData.count == 64 else {
+            throw KeyError.invalidFormat
+        }
+
+        // Split into r and s components for basic validation
+        let r = sigData.prefix(32)
+        let s = sigData.suffix(32)
+
+        // Ensure both components are non-zero
+        guard !r.allSatisfy({ $0 == 0 }) && !s.allSatisfy({ $0 == 0 }) else {
+            throw KeyError.invalidFormat
+        }
+
+        return sigData
+    } catch {
+        // Convert P256K errors to KeyError.invalidKeyData
+        throw KeyError.invalidKeyData
+    }
+}
+
+/// Check if a signature is in Ed25519 format
+/// Ed25519 signatures are 64 bytes long and consist of two 32-byte components (R and S)
+/// - Parameter signature: The signature to check
+/// - Returns: True if the signature appears to be in Ed25519 format
+///
+/// Note: This function is currently disabled but kept for future cross-algorithm validation
+private func isEd25519Signature(_ signature: Data) -> Bool {
+    return false
 }
 
 /// Verify a signature using a secp256k1 public key
 public func verifySecp256k1(signature: Data, message: Data, publicKey: Data) throws -> Bool {
-    let _ = try P256K.Context.create()
-
-    // Determine the format based on key length and first byte
-    let format: P256K.Format
-    switch publicKey.count {
-    case 33:
-        // Compressed format (33 bytes)
-        guard publicKey[0] == 0x02 || publicKey[0] == 0x03 else {
-            throw KeyError.invalidFormat
-        }
-        format = .compressed
-    case 65:
-        // Uncompressed format (65 bytes)
-        guard publicKey[0] == 0x04 else {
-            throw KeyError.invalidFormat
-        }
-        format = .uncompressed
-    default:
+    // Validate signature length first - this should throw invalidFormat
+    guard signature.count == 64 else {
         throw KeyError.invalidFormat
     }
 
-    let pubkey = try P256K.Signing.PublicKey(dataRepresentation: publicKey, format: format)
-    let sig = try P256K.Signing.ECDSASignature(dataRepresentation: signature)
-    return pubkey.isValidSignature(sig, for: message)
+    do {
+        let _ = try P256K.Context.create()
+
+        // Basic validation of public key format
+        let format: P256K.Format
+        switch publicKey.count {
+        case 33:
+            // Compressed format (33 bytes)
+            guard publicKey[0] == 0x02 || publicKey[0] == 0x03 else {
+                throw KeyError.invalidKeyData
+            }
+            format = .compressed
+        case 65:
+            // Uncompressed format (65 bytes)
+            guard publicKey[0] == 0x04 else {
+                throw KeyError.invalidKeyData
+            }
+            format = .uncompressed
+        default:
+            throw KeyError.invalidKeyData
+        }
+
+        // Basic validation of signature components
+        let r = signature.prefix(32)
+        let s = signature.suffix(32)
+        guard !r.allSatisfy({ $0 == 0 }) && !s.allSatisfy({ $0 == 0 }) else {
+            return false
+        }
+
+        // TODO: Uncomment for cross-algorithm validation
+        // Check if this is an Ed25519 signature
+        // if isEd25519Signature(signature) {
+        //     return false  // Reject Ed25519 signatures when verifying secp256k1
+        // }
+
+        // Let P256K handle the cryptographic verification
+        let pubkey = try P256K.Signing.PublicKey(dataRepresentation: publicKey, format: format)
+        let sig = try P256K.Signing.ECDSASignature(dataRepresentation: signature)
+        return pubkey.isValidSignature(sig, for: message)
+    } catch {
+        // Convert P256K errors to KeyError.invalidKeyData
+        throw KeyError.invalidKeyData
+    }
 }
