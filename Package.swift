@@ -67,31 +67,52 @@ let package = Package(
         // Test targets for each module
         .testTarget(
             name: "AgentCommerceKitTests",
-            dependencies: ["AgentCommerceKit"]
+            dependencies: ["AgentCommerceKit"],
+            swiftSettings: [
+                .define("CRYPTO_IN_SWIFTPM_FORCE_BUILD_API", .when(configuration: .debug))
+            ]
         ),
         .testTarget(
             name: "IdentityTests",
-            dependencies: ["Identity"]
+            dependencies: ["Identity"],
+            swiftSettings: [
+                .define("CRYPTO_IN_SWIFTPM_FORCE_BUILD_API", .when(configuration: .debug))
+            ]
         ),
         .testTarget(
             name: "PaymentTests",
-            dependencies: ["Payment"]
+            dependencies: ["Payment"],
+            swiftSettings: [
+                .define("CRYPTO_IN_SWIFTPM_FORCE_BUILD_API", .when(configuration: .debug))
+            ]
         ),
         .testTarget(
             name: "DIDTests",
-            dependencies: ["DID"]
+            dependencies: ["DID"],
+            swiftSettings: [
+                .define("CRYPTO_IN_SWIFTPM_FORCE_BUILD_API", .when(configuration: .debug))
+            ]
         ),
         .testTarget(
             name: "JWTTests",
-            dependencies: ["JWT"]
+            dependencies: ["JWT"],
+            swiftSettings: [
+                .define("CRYPTO_IN_SWIFTPM_FORCE_BUILD_API", .when(configuration: .debug))
+            ]
         ),
         .testTarget(
             name: "KeysTests",
-            dependencies: ["Keys"]
+            dependencies: ["Keys"],
+            swiftSettings: [
+                .define("CRYPTO_IN_SWIFTPM_FORCE_BUILD_API", .when(configuration: .debug))
+            ]
         ),
         .testTarget(
             name: "VCTests",
-            dependencies: ["VC"]
+            dependencies: ["VC"],
+            swiftSettings: [
+                .define("CRYPTO_IN_SWIFTPM_FORCE_BUILD_API", .when(configuration: .debug))
+            ]
         )
     ]
 )
